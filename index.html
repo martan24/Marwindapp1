@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ar Mor Navigation — Bretagne</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #1e293b; border-bottom: 1px solid #334155; }
+  header h1 { font-size: 17px; }
+  header .sub { font-size: 11px; color: #22d3ee; }
+  .spacer { flex: 1; }
+  .badge { font-size: 11px; background: #064e3b; color: #6ee7b7; border: 1px solid #047857; border-radius: 99px; padding: 3px 10px; }
+  #layout { display: flex; flex: 1; min-height: 0; }
+  /* ---- left panel ---- */
+  #left { width: 340px; flex-shrink: 0; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; min-height: 0; }
+  #tabs { display: flex; border-bottom: 1px solid #334155; }
+  #tabs button { flex: 1; padding: 10px 0; background: none; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-size: 13px; cursor: pointer; }
+  #tabs button.active { color: #22d3ee; border-bottom-color: #22d3ee; background: rgba(34,211,238,.08); }
+  .portlabel { background: rgba(15,23,42,.85); border: 1px solid #334155; color: #e2e8f0; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.5); pointer-events: none; }
+  .portlabel::before { display: none; }
+  #map:not(.zoomed) .portlabel { display: none; }
+  #panel { flex: 1; overflow-y: auto; padding: 12px; }
+  .card { background: rgba(30,41,59,.7); border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .card.sel { border-color: #22d3ee; background: rgba(34,211,238,.1); }
+  .card h3 { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  .muted { color: #94a3b8; font-size: 11px; }
+  .stars { color: #fbbf24; font-size: 12px; }
+  .ok { color: #34d399; } .mid { color: #fbbf24; } .bad { color: #fb7185; }
+  input, select, textarea { background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; padding: 8px; font-size: 13px; width: 100%; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: #06b6d4; }
+  .btn { background: #06b6d4; color: #0f172a; border: none; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 13px; cursor: pointer; width: 100%; margin-top: 6px; }
+  .btn:hover { background: #22d3ee; }
+  .btn.green { background: #10b981; } .btn.green:hover { background: #34d399; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .chip { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; background: #334155; margin: 2px; }
+  .chip.free { background: #064e3b; color: #6ee7b7; } .chip.prem { background: #78350f; color: #fcd34d; }
+  a.link { color: #67e8f9; text-decoration: none; font-size: 13px; font-weight: 600; }
+  a.link:hover { text-decoration: underline; }
+  /* ---- map ---- */
+  #mapwrap { position: relative; flex: 1; min-width: 0; }
+  #map { height: 100%; background: #0a1c33; }
+  #manBanner { display:none; position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:1000;
+    background:rgba(15,23,42,.92); border:1px solid #f59e0b; color:#fbbf24; font-size:12px; padding:6px 14px; border-radius:99px; }
+  .mode { display:flex; gap:6px; margin-top:8px; }
+  .mode button { flex:1; padding:8px 4px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#94a3b8; cursor:pointer; font-size:11px; }
+  .mode button.active { background:rgba(34,211,238,.15); color:#22d3ee; border-color:#22d3ee; font-weight:700; }
+  .leaflet-container { background: #0a1c33; }
+  .port-pin, .crique-pin { display:flex; align-items:center; justify-content:center; font-size: 13px; }
+  .port-pin { background:#06b6d4; } .crique-pin { background:#f59e0b; }
+  /* ---- drawer ---- */
+  #drawer { width: 380px; flex-shrink: 0; background: #1e293b; border-left: 1px solid #334155; overflow-y: auto; display: none; }
+  #drawer.open { display: block; }
+  .drawer-head { background: linear-gradient(90deg,#164e63,#1e3a5f,#1e293b); padding: 14px; position: relative; }
+  .drawer-head h2 { font-size: 18px; }
+  .steps { display: flex; border-bottom: 1px solid #334155; position: sticky; top: 0; background: #1e293b; z-index: 5; }
+  .steps button { flex:1; padding: 8px 0; font-size: 11px; background: none; border: none; border-bottom: 2px solid transparent; color: #94a3b8; cursor: pointer; }
+  .steps button.active { color: #22d3ee; border-bottom-color: #22d3ee; background: rgba(34,211,238,.08); }
+  .steps button:disabled { opacity: .3; }
+  .close { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 99px; background: rgba(15,23,42,.8); border: 1px solid #475569; color: #cbd5e1; cursor: pointer; }
+  .body { padding: 12px; }
+  .wgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; text-align: center; margin-top: 8px; }
+  .wcell { background: rgba(15,23,42,.6); border-radius: 8px; padding: 8px 4px; }
+  .wcell .l { font-size: 10px; color: #94a3b8; } .wcell .v { font-size: 13px; font-weight: 700; }
+  .bar { height: 8px; background: #334155; border-radius: 99px; overflow: hidden; margin: 8px 0; }
+  .bar > div { height: 100%; background: linear-gradient(90deg,#06b6d4,#34d399); }
+  .rev { background: rgba(30,41,59,.7); border: 1px solid #334155; border-radius: 8px; padding: 8px; margin-top: 8px; font-size: 12px; }
+  #fallback { margin: 30px; text-align: center; line-height: 1.6; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #e2e8f0; }
+  #panelToggle { position:absolute; top:10px; left:10px; z-index:1000; background:rgba(30,41,59,.92); color:#22d3ee; border:1px solid #334155; border-radius:10px; padding:8px 12px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+  #panelToggle:hover { background:#334155; }
+  #left.hidden { display:none; }
+  @media (max-width: 900px) { #left { width: 280px; } #drawer { width: 320px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span style="font-size:22px">⚓</span>
+    <div><h1>Ar Mor Navigation</h1><div class="sub">Ports, criques &amp; communauté — Bretagne</div></div>
+    <div class="spacer"></div>
+    <div id="bkBadge" class="badge" style="display:none"></div>
+  </header>
+  <div id="layout">
+    <aside id="left">
+      <div id="tabs">
+        <button data-tab="navily" class="active">⚓ Ports</button>
+        <button data-tab="meteo">🌬️ Météo</button>
+        <button data-tab="routage">🧭 Routage</button>
+        <button data-tab="social">👥 Communauté</button>
+      </div>
+      <div id="panel"></div>
+    </aside>
+    <main id="mapwrap">
+      <button id="panelToggle" onclick="togglePanel()" title="Afficher/masquer le panneau">☰</button>
+      <div id="manBanner">✏️ Mode manuel : cliquez sur la carte pour poser vos waypoints</div>
+      <div id="map"></div>
+    </main>
+    <aside id="drawer"></aside>
+  </div>
+</div>
+
+<div id="fallback" style="display:none">
+  <h2>🗺️ Fond de carte indisponible dans cet aperçu</h2>
+  <p>L'aperçu du canvas bloque l'accès réseau.</p>
+  <p style="margin-top:10px"><b>Téléchargez ce fichier (bouton d'export du canvas) et ouvrez-le dans votre navigateur :</b><br/>
+  la carte satellite, le plan OSM et les balises OpenSeaMap se chargeront alors normalement.</p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+// ================== DONNÉES ==================
+const SPOTS = [
+  { id:"saint-malo", name:"Saint-Malo", kind:"port", lat:48.6496, lon:-2.0255, desc:"Grande cité corsaire, bassins Vauban et Sablons. Port animé, tous services, accès direct au centre historique.", places:350, occupied:291, price:28, depth:4, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi","Grue","Travel lift"], rev:[["Gwenael B.",4,"Accueil pro, bassin Sablons pratique. Un peu cher en saison.","2026-08-12"],["Loïc T.",5,"Vue sur les remparts du ponton, magique au coucher du soleil.","2026-09-02"]] },
+  { id:"dinard", name:"Dinard", kind:"port", lat:48.6325, lon:-2.0432, desc:"Marina de la Rance, ambiance balnéaire, mouillage possible en face de Saint-Malo.", places:180, occupied:142, price:24, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Supérette"], rev:[["Anne S.",5,"Tranquille et très bien tenu, parfait avec des enfants.","2026-07-20"]] },
+  { id:"cancale", name:"Cancale", kind:"port", lat:48.6759, lon:-1.8399, desc:"Port des huîtres, à l'abri de la pointe du Grouin. Départ idéal pour la baie du Mont-Saint-Michel.", places:120, occupied:88, price:19, depth:3, amen:["Électricité","Eau","Douche","Glacier","Marché à huîtres"], rev:[["Pierre M.",4,"Attention aux grandes marées au mouillage de la cale.","2026-06-15"]] },
+  { id:"saint-quay", name:"Saint-Quay-Portrieux", kind:"port", lat:48.6553, lon:-2.8291, desc:"Abri remarquable derrière les îlots, porte d'entrée du Trégor.", places:230, occupied:160, price:21, depth:4, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi"], rev:[["Nolwenn R.",5,"Excellent abri par vent d'ouest, très bon accueil.","2026-08-01"]] },
+  { id:"paimpol", name:"Paimpol", kind:"port", lat:48.7862, lon:-3.0486, desc:"Charmant port goémonier, proximité de Bréhat et de l'abbaye de Beauport.", places:160, occupied:118, price:20, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"], rev:[["Yann D.",4,"Port pittoresque, fonds de 2,5 m à marée basse côté nord.","2026-05-28"]] },
+  { id:"treguier", name:"Tréguier", kind:"port", lat:48.7317, lon:-3.3413, desc:"Cathédrale en fond de ria, escale fluviale très abritée du vent d'ouest.", places:140, occupied:95, price:18, depth:3, amen:["Électricité","Eau","Douche","Chantier naval"], rev:[["Marie K.",5,"Coup de cœur : monter à la cathédrale au crépuscule.","2026-07-05"]] },
+  { id:"roscoff", name:"Roscoff", kind:"port", lat:48.7249, lon:-4.2228, desc:"Port d'attache des ferries, très bon abri, jardin exotique à 10 min à pied.", places:200, occupied:144, price:21, depth:5, amen:["Électricité","Eau","Douche","Carburant","Grue"], rev:[["Tiago F.",4,"Bien protégé, courants forts dans le chenal d'accès.","2026-06-30"]] },
+  { id:"brest", name:"Brest (Moulin Blanc)", kind:"port", lat:48.3809, lon:-4.4984, desc:"Base idéale pour la rade et la mer d'Iroise. Océanopolis à côté du port.", places:400, occupied:310, price:23, depth:6, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi","Travel lift","Chantier"], rev:[["Corentin L.",4,"Grosse structure efficace, très pratique.","2026-04-18"]] },
+  { id:"camaret", name:"Camaret-sur-Mer", kind:"port", lat:48.3431, lon:-4.5941, desc:"Abri historique de la rade de Brest, protégé par le fort Vauban.", places:150, occupied:101, price:19, depth:4, amen:["Électricité","Eau","Douche","Chantier"], rev:[["Soaz G.",5,"Le meilleur abri d'Iroise par gros temps.","2026-03-22"]] },
+  { id:"douarnenez", name:"Douarnenez (Tréboul)", kind:"port", lat:48.1011, lon:-4.3433, desc:"Baie magnifique, port animé, musée du bateau à portée de ponton.", places:190, occupied:122, price:18, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"], rev:[["Ronan P.",4,"Escale favorite du Trégor au Raz.","2026-09-14"]] },
+  { id:"audierne", name:"Audierne", kind:"port", lat:48.0271, lon:-4.5477, desc:"Fjord miniature entre les falaises, escale avant le raz de Sein ou la pointe du Raz.", places:110, occupied:73, price:17, depth:3, amen:["Électricité","Eau","Douche","Carburant"], rev:[["Elise V.",5,"Arriver au creux de la falaise, toujours un beau moment.","2026-08-25"]] },
+  { id:"concarneau", name:"Concarneau", kind:"port", lat:47.8737, lon:-3.9206, desc:"Ville close en face du port, pêche et plaisance mêlées.", places:220, occupied:168, price:22, depth:5, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi"], rev:[["Alan C.",4,"Bien placé pour les Glénan, 12 milles au sud.","2026-07-12"]] },
+  { id:"port-la-foret", name:"Port-la-Forêt", kind:"port", lat:47.8191, lon:-3.9507, desc:"Base des grands skippers, ambiance course au large, chantiers de renom.", places:240, occupied:190, price:21, depth:5, amen:["Électricité","Eau","Douche","Travel lift","Chantier"], rev:[["Fred A.",5,"Vraie marina de marins, service impeccable.","2026-05-09"]] },
+  { id:"lorient", name:"Lorient (Kernevel)", kind:"port", lat:47.7273, lon:-3.3713, desc:"Ex-base des sous-marins, aujourd'hui la Cité de la Voile Eric Tabarly.", places:330, occupied:240, price:23, depth:6, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi","Grue","Chantier"], rev:[["Julie N.",4,"Top pour préparer une transat, tout sur place.","2026-06-02"]] },
+  { id:"etel", name:"Étel", kind:"port", lat:47.6559, lon:-3.2118, desc:"Petite ria sauvage, barre à surveiller à l'entrée, havre très tranquille.", places:130, occupied:84, price:16, depth:2, amen:["Électricité","Eau","Douche","Commerces"], rev:[["Mathieu H.",5,"La barre se passe bien à marée haute.","2026-08-08"]] },
+  { id:"vannes", name:"Vannes (Le Vincin)", kind:"port", lat:47.6554, lon:-2.7583, desc:"Au fond du golfe, port du Vincin, ville médiévale à 15 min à pied.", places:200, occupied:157, price:22, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"], rev:[["Claire O.",4,"Attention au courant dans le golfe, mais escale superbe.","2026-07-27"]] },
+  { id:"trinite", name:"La Trinité-sur-Mer", kind:"port", lat:47.5614, lon:-3.0400, desc:"Capitale de la course au large, ambiance port au calme.", places:150, occupied:112, price:24, depth:3, amen:["Électricité","Eau","Douche","Carburant","Commerces"], rev:[["Bastien R.",5,"Superbe site, réserver tôt en juillet-août.","2026-08-20"]] },
+  { id:"port-navalo", name:"Port Navalo (Arzon)", kind:"port", lat:47.5250, lon:-2.8614, desc:"À l'entrée du golfe du Morbihan, porte d'entrée côte ouest.", places:170, occupied:121, price:21, depth:4, amen:["Électricité","Eau","Douche","Wi-Fi"], rev:[["Gael W.",4,"Stratégique pour aller se poser à Port-Blanc.","2026-06-21"]] },
+  { id:"le-palais", name:"Le Palais (Belle-Île)", kind:"port", lat:47.3533, lon:-3.1536, desc:"Golfe intérieur, citadelle Vauban, port le plus abrité de Belle-Île.", places:210, occupied:180, price:26, depth:4, amen:["Électricité","Eau","Douche","Carburant","Commerces"], rev:[["Helene J.",5,"Le plan d'eau intérieur vaut le détour, arrivez avant 17h.","2026-07-30"]] },
+  { id:"port-tudy", name:"Port-Tudy (Groix)", kind:"port", lat:47.6400, lon:-3.4711, desc:"Port en eau profonde de l'île de Groix, ambiance îlienne garantie.", places:160, occupied:109, price:19, depth:5, amen:["Électricité","Eau","Douche","Commerces"], rev:[["Sylvain B.",4,"Bonne escale protégée des vents d'est.","2026-05-15"]] },
+  { id:"sauzon", name:"Sauzon (Belle-Île)", kind:"port", lat:47.3525, lon:-3.2014, desc:"Petit port de pêche abrité, entrée spectaculaire entre falaises rouges.", places:90, occupied:61, price:18, depth:4, amen:["Électricité","Eau","Douche"], rev:[["Aurelie P.",5,"Port rouge et falaises, notre escale préférée.","2026-08-15"]] },
+  { id:"crouesty", name:"Le Crouesty (Arzon)", kind:"port", lat:47.5286, lon:-2.8864, desc:"Grande marina moderne de la baie de Quiberon, tous services.", places:1450, occupied:1190, price:25, depth:4, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi","Grue","Commerces"], rev:[["Didier F.",4,"Très grand port, très bien organisé.","2026-07-08"]] },
+  { id:"benodet", name:"Bénodet", kind:"port", lat:47.8642, lon:-4.0947, desc:"Station balnéaire de l'Odet, escale fluviale et maritime.", places:180, occupied:132, price:20, depth:3, amen:["Électricité","Eau","Douche","Carburant"], rev:[["Nathalie D.",4,"Remonter l'Odet jusqu'à Quimper, superbe.","2026-06-14"]] },
+  { id:"locquirec", name:"Anse de Locquirec", kind:"crique", lat:49.0139, lon:-3.7322, desc:"Mouillage de sable, abri des vents d'ouest, joli village au fond de l'anse.", depth:3, rev:[["Morgane D.",4,"Beau mouillage, fonds de sable, annexe nécessaire.","2026-06-10"]], exp:"N,NE" },
+  { id:"morlaix", name:"Baie de Morlaix (Carantec)", kind:"crique", lat:48.6703, lon:-3.9281, desc:"Grande baie abritée, mouillage au large de Carantec, chenal balisé à respecter.", depth:5, rev:[["Olivier L.",5,"Un des plus beaux mouillages du Trégor, calme absolu.","2026-07-18"]], exp:"N,NO" },
+  { id:"fret", name:"Anse du Fret", kind:"crique", lat:48.3308, lon:-4.3606, desc:"Au coeur de la rade de Brest, protection totale, ambiance nature.", depth:6, rev:[["Nael T.",5,"Le refuge parfait quand l'Iroise déferle.","2026-02-14"]], exp:"NE" },
+  { id:"morgat", name:"Baie de Morgat", kind:"crique", lat:48.2436, lon:-4.4772, desc:"Plage de sable dans l'échancrure de Crozon, jolie station balnéaire.", depth:3, rev:[["Lina F.",4,"Attention à la houle résiduelle par sud-ouest.","2026-08-03"]], exp:"SO,O" },
+  { id:"anse-dinan", name:"Anse de Dinan", kind:"crique", lat:48.0844, lon:-4.6586, desc:"Entre les falaises du Cap Sizun, cadre spectaculaire, mouillage par beau temps.", depth:4, rev:[["Kevin M.",5,"Falaises dorées au soleil couchant, inoubliable.","2026-09-08"]], exp:"S,SO,O" },
+  { id:"baie-audierne", name:"Baie d'Audierne (Trescadec)", kind:"crique", lat:47.9547, lon:-4.4306, desc:"Longue plage de sable au vent, débarquement facile en annexe.", depth:3, rev:[["Enora C.",3,"Beau mais exposé au sud-ouest, venir par temps stable.","2026-06-25"]], exp:"S,SO,O" },
+  { id:"la-foret", name:"Baie de La Forêt", kind:"crique", lat:47.7753, lon:-3.8836, desc:"Mouillage abrité par la presqu'île de Beg-Meil, fond de sable et vasières.", depth:2, rev:[["Josselin R.",4,"Très calme, attention au tirant d'eau à basse mer.","2026-07-09"]], exp:"E,SE" },
+  { id:"port-blanc", name:"Port-Blanc (Golfe)", kind:"crique", lat:47.5986, lon:-2.7822, desc:"Au coeur du golfe du Morbihan, mouillage bucolique face aux îles.", depth:3, rev:[["Thierry V.",5,"En période de grandes marées, un régal.","2026-09-21"]], exp:"NE" },
+  { id:"quiberon-bay", name:"Baie de Quiberon", kind:"crique", lat:47.4736, lon:-3.0528, desc:"Grande baie ouverte, mouillages en eau turquoise par vent d'est.", depth:5, rev:[["Nadia S.",4,"Idéal si l'anticyclone tient, baignade parfaite.","2026-07-22"]], exp:"O,SO" },
+  { id:"houat", name:"Houat (Crique du Gourec)", kind:"crique", lat:47.3464, lon:-2.9064, desc:"Eaux turquoise, prés sauvages, mouillage par vents d'est.", depth:3, rev:[["Serge L.",5,"Faïence de sable blanc, les Seychelles bretonnes.","2026-08-11"]], exp:"O,SO" },
+  // ---- mouillages & abris connus de Bretagne ----
+  { id:"guermel", name:"Anse de Guermel (Plougrescant)", kind:"crique", lat:48.7975, lon:-3.3613, desc:"Petit joyau du Trégor, protégé par la presqu'île, très fréquenté l'été.", depth:4, exp:"N,NE" },
+  { id:"port-blanc-tregor", name:"Port-Blanc (Penvénan)", kind:"crique", lat:48.8152, lon:-3.2915, desc:"Anse abritée derrière les îlots, chenal d'entrée à respecter à marée basse.", depth:3, exp:"N,NE" },
+  { id:"brehat-chambre", name:"La Chambre (Bréhat)", kind:"crique", lat:48.8797, lon:-3.0063, desc:"Plan d'eau emblématique entre les deux îles, abri quasi total.", depth:5, exp:"E" },
+  { id:"brebastel", name:"Brébastel (Paimpol)", kind:"crique", lat:48.7762, lon:-3.0512, desc:"Anse close de Paimpol, abri de choix avant d'entrer dans le port.", depth:3, exp:"NE,E" },
+  { id:"trieux-runello", name:"Le Trieux (Runello)", kind:"crique", lat:48.7353, lon:-3.1752, desc:"Mouillage au milieu du Trieux, rivière sauvage et calme.", depth:5, exp:"E,NE" },
+  { id:"perros-rade", name:"Rade de Perros-Guirec", kind:"crique", lat:48.7963, lon:-3.4392, desc:"Grande rade face aux Sept-Îles, roule par secteur nord.", depth:8, exp:"N,NE" },
+  { id:"ile-batz-anse", name:"Île de Batz (anse)", kind:"crique", lat:48.7601, lon:-3.9862, desc:"Au sud de l'île, dunes et jardins, très calme par vent de sud-ouest.", depth:5, exp:"N,NO" },
+  { id:"kerlouan", name:"Anse de Kerlouan", kind:"crique", lat:48.6803, lon:-4.4242, desc:"Plage de sable bordée de rochers, mouillage de beau temps.", depth:3, exp:"N,NO" },
+  { id:"frehel-baie", name:"Baie de Fréhel", kind:"crique", lat:48.6232, lon:-2.3684, desc:"Sous le cap Fréhel, cadre sauvage mais peu de protection.", depth:5, exp:"N,NE,E" },
+  { id:"bassaine", name:"La Bassaine (Saint-Malo)", kind:"crique", lat:48.6524, lon:-2.0285, desc:"Juste à l'ouest de Saint-Malo, roule aux vents de nord.", depth:6, exp:"N,NE" },
+  { id:"auberlach", name:"Anse de l'Auberlac'h (rade de Brest)", kind:"crique", lat:48.3253, lon:-4.6128, desc:"Au fond de la rade, protection quasi totale, eaux calmes.", depth:5, exp:"NO,O" },
+  { id:"poulmic", name:"Anse de Poulmic (Camaret)", kind:"crique", lat:48.3512, lon:-4.4967, desc:"Grande anse de la rade, ancienne base sous-marine, place pour tous.", depth:9, exp:"O,SO" },
+  { id:"douarnenez-trez", name:"Baie de Douarnenez (Trez Maria)", kind:"crique", lat:48.1708, lon:-4.3151, desc:"Longue plage au fond de la baie, roule par secteur est.", depth:4, exp:"E,SE" },
+  { id:"port-coton", name:"Port-Coton (Belle-Île)", kind:"crique", lat:47.3221, lon:-3.1912, desc:"Aiguilles spectaculaires, mouillage de beau temps uniquement.", depth:6, exp:"S,SO,O" },
+  { id:"sauzon-ster", name:"Ster-en-Tribulen (Sauzon)", kind:"crique", lat:47.3487, lon:-3.2225, desc:"Devant Sauzon, protégé des gros secteurs sud.", depth:5, exp:"O,NO" },
+  { id:"groix-melite", name:"Groix (Port Mélite)", kind:"crique", lat:47.6462, lon:-3.4628, desc:"Côte nord de Groix, abrité des sud-ouest dominants.", depth:5, exp:"S,SO" },
+  { id:"glenan-anse", name:"Glénan (anse nord)", kind:"crique", lat:47.4325, lon:-4.0088, desc:"Devant le centre nautique, eau turquoise par beau temps.", depth:5, exp:"S,SO,O" },
+  { id:"gavres-baie", name:"Baie de Gâvres", kind:"crique", lat:47.7182, lon:-3.3624, desc:"Derrière la presqu'île, abri des vents d'ouest.", depth:4, exp:"O,SO" },
+  { id:"belomer", name:"Bélomer (Quiberon)", kind:"crique", lat:47.5323, lon:-3.1876, desc:"Face à Quiberon, plat par secteur est, roule à l'ouest.", depth:4, exp:"O,NO" },
+  { id:"port-navalo-anse", name:"Port-Navalo (entrée du golfe)", kind:"crique", lat:47.5203, lon:-2.8763, desc:"Point d'entrée du golfe du Morbihan, veiller aux courants.", depth:5, exp:"O,SO" },
+  { id:"arz-belure", name:"Île d'Arz (Béluré)", kind:"crique", lat:47.5753, lon:-2.8064, desc:"Grande plage de l'île d'Arz, ambiance familiale.", depth:3, exp:"NE,E" },
+  { id:"bono-anse", name:"Le Bono", kind:"crique", lat:47.6153, lon:-2.9321, desc:"Rivière d'Auray, abri total, ponton du bourg à proximité.", depth:4, exp:"E,SE" },
+  { id:"vilaine-penestin", name:"Estuaire de la Vilaine (Pénestin)", kind:"crique", lat:47.5128, lon:-2.3225, desc:"Dans l'estuaire, abri de tous secteurs sauf nord.", depth:4, exp:"N,NO" },
+  { id:"baule-anse", name:"Anse de La Baule", kind:"crique", lat:47.2831, lon:-2.3303, desc:"Grande baie en arc, mouillage par secteur est, roule à l'ouest.", depth:5, exp:"O,SO" },
+  // ---- ports bretons étendus (Finistère nord) ----
+  { id:"le-conquet", name:"Le Conquet", kind:"port", lat:48.361, lon:-4.764, desc:"Port de voyageurs pour Ouessant et Molène, abri correct par mistral d'ouest.", places:90, occupied:71, price:16, depth:4, amen:["Électricité","Eau","Douche"] },
+  { id:"lanildut", name:"Lanildut", kind:"port", lat:48.423, lon:-4.752, desc:"Port goémonier du passage du Fromveur, départ vers Molène.", places:120, occupied:93, price:15, depth:3, amen:["Électricité","Eau","Douche","Cale"] },
+  { id:"portsall", name:"Portsall", kind:"port", lat:48.552, lon:-4.688, desc:"Petit port de l'Aber-Benoît, très abrité dans l'estuaire.", places:90, occupied:68, price:15, depth:3, amen:["Électricité","Eau"] },
+  { id:"landeda", name:"Landéda (Le Stang)", kind:"port", lat:48.574, lon:-4.572, desc:"Face à l'île de Béniguet, port paisible de l'Aber-Wrac'h.", places:80, occupied:61, price:15, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"aber-wrach", name:"Aber-Wrac'h (Bourg)", kind:"port", lat:48.601, lon:-4.606, desc:"Au fond de l'estuaire, escale pittoresque et vitrines de marine.", places:120, occupied:92, price:16, depth:3, amen:["Électricité","Eau","Douche","Commerces"] },
+  { id:"brignogan", name:"Brignogan", kind:"port", lat:48.602, lon:-4.624, desc:"Plage du cottage, petit havre entre les dunes.", places:60, occupied:44, price:14, depth:2, amen:["Électricité","Eau"] },
+  { id:"plouescat", name:"Plouescat", kind:"port", lat:48.693, lon:-4.168, desc:"Port à sec et à flot du Haut-Léon.", places:120, occupied:87, price:15, depth:3, amen:["Électricité","Eau","Douche","Grue"] },
+  { id:"carantec", name:"Carantec (Pen Lann)", kind:"port", lat:48.672, lon:-3.928, desc:"Belle marina de la baie de Morlaix, école de voile réputée.", places:150, occupied:116, price:18, depth:3, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi"] },
+  { id:"le-diben", name:"Le Diben (Plougasnou)", kind:"port", lat:48.684, lon:-3.993, desc:"Port de pêche typique du pays de Léon.", places:130, occupied:96, price:15, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"saint-jean-doigt", name:"Saint-Jean-du-Doigt", kind:"port", lat:48.668, lon:-4.114, desc:"Petit port de fond de crique, ambiance de bout du monde.", places:70, occupied:52, price:14, depth:3, amen:["Électricité","Eau"] },
+  { id:"locquirec-port", name:"Locquirec (port)", kind:"port", lat:48.683, lon:-3.681, desc:"Joli port de fond d'anse, front de mer fleuri.", places:100, occupied:78, price:15, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"trebeurden", name:"Trébeurden", kind:"port", lat:48.763, lon:-3.551, desc:"Marina des plages de granit rose, toutes commodités.", places:130, occupied:101, price:19, depth:3, amen:["Électricité","Eau","Douche","Carburant","Commerces"] },
+  { id:"ploumanach", name:"Ploumanac'h", kind:"port", lat:48.831, lon:-3.412, desc:"Site des roches de granit rose, l'un des plus beaux ports du monde.", places:90, occupied:72, price:17, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"lezardrieux", name:"Lézardrieux", kind:"port", lat:48.775, lon:-3.111, desc:"Au fond du Trieux, accès facile par la fableuse rivière.", places:180, occupied:132, price:16, depth:4, amen:["Électricité","Eau","Douche","Chantier"] },
+  { id:"arcouest", name:"L'Arcouest (Ploubazlanec)", kind:"port", lat:48.817, lon:-3.005, desc:"Port de départ pour Bréhat, vue imprenable sur l'île.", places:60, occupied:47, price:13, depth:3, amen:["Électricité","Eau"] },
+  { id:"binic", name:"Binic", kind:"port", lat:48.600, lon:-2.929, desc:"Au fond de la baie, station familiale et port de plaisance.", places:150, occupied:112, price:17, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"] },
+  { id:"etables", name:"Étables-sur-Mer", kind:"port", lat:48.633, lon:-2.778, desc:"Petite marina tranquille près de Saint-Quay.", places:100, occupied:73, price:16, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"saint-cast", name:"Saint-Cast-le-Guildo", kind:"port", lat:48.593, lon:-2.241, desc:"Grande plage et port abrité de la côte d'Émeraude.", places:200, occupied:153, price:19, depth:3, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi"] },
+  // ---- Finistère sud + rade de Brest + Crozon ----
+  { id:"esquibien", name:"Esquibien", kind:"port", lat:48.036, lon:-4.606, desc:"Petit port du Cap Sizun, mouillage paisible.", places:70, occupied:51, price:14, depth:3, amen:["Électricité","Eau"] },
+  { id:"saint-guenole", name:"Saint-Guénolé (Penmarc'h)", kind:"port", lat:47.801, lon:-4.368, desc:"Grand port de pêche battu par la houle d'ouest.", places:100, occupied:77, price:15, depth:4, amen:["Électricité","Eau","Douche","Carburant"] },
+  { id:"guilvinec", name:"Le Guilvinec", kind:"port", lat:47.721, lon:-4.301, desc:"Premier port de pêche français pour la pêche fraîche, Haliotika à visiter.", places:110, occupied:84, price:15, depth:5, amen:["Électricité","Eau","Douche","Carburant"] },
+  { id:"loctudy", name:"Loctudy", kind:"port", lat:47.829, lon:-4.191, desc:"Port bigouden de la ria du Pont-l'Abbé.", places:140, occupied:103, price:16, depth:4, amen:["Électricité","Eau","Douche","Marché"] },
+  { id:"sainte-marine", name:"Sainte-Marine (Combrit)", kind:"port", lat:47.861, lon:-4.102, desc:"Face à Bénodet sur l'Odet, ambiance douce.", places:150, occupied:117, price:18, depth:3, amen:["Électricité","Eau","Douche","Commerces"] },
+  { id:"doelan", name:"Doëlan", kind:"port", lat:47.803, lon:-3.514, desc:"Charmant petit port de la rivière de Pont-Aven, deux phares rouges.", places:70, occupied:55, price:14, depth:2, amen:["Électricité","Eau"] },
+  { id:"pouldu", name:"Le Pouldu", kind:"port", lat:47.762, lon:-3.507, desc:"Embouchure de la Laïta, plages des peintres de Pont-Aven.", places:90, occupied:69, price:16, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"lomener", name:"Lomener (Ploemeur)", kind:"port", lat:47.701, lon:-3.362, desc:"Abri des vents d'est dans la baie de Lorient.", places:110, occupied:83, price:16, depth:4, amen:["Électricité","Eau","Douche"] },
+  { id:"port-louis", name:"Port-Louis", kind:"port", lat:47.711, lon:-3.451, desc:"Citadelle et port à l'entrée de la rade de Lorient.", places:120, occupied:91, price:16, depth:4, amen:["Électricité","Eau","Douche","Citadelle"] },
+  { id:"lanveoc", name:"Lanvéoc", kind:"port", lat:48.292, lon:-4.453, desc:"Sur la rive sud de la rade de Brest, calme absolu.", places:150, occupied:114, price:17, depth:4, amen:["Électricité","Eau","Douche"] },
+  { id:"landevennec", name:"Landévennec", kind:"port", lat:48.289, lon:-4.287, desc:"Au fond de la rade, abbaye et forêt domaniale.", places:60, occupied:41, price:14, depth:5, amen:["Électricité","Eau"] },
+  { id:"morgat", name:"Morgat", kind:"port", lat:48.244, lon:-4.478, desc:"Station balnéaire de Crozon, plage dans l'échancrure.", places:130, occupied:98, price:17, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi"] },
+  // ---- Quiberon / Morbihan ----
+  { id:"port-haliguen", name:"Port Haliguen (Quiberon)", kind:"port", lat:47.484, lon:-3.170, desc:"Grande marina de la presqu'île, porte d'entrée vers Belle-Île, Houat et Hoëdic.", places:340, occupied:277, price:24, depth:4, amen:["Électricité","Eau","Douche","Carburant","Grue","Commerces"] },
+  { id:"ile-aux-moines", name:"Île-aux-Moines", kind:"port", lat:47.569, lon:-2.856, desc:"La perle du golfe, petit port et criques.", places:80, occupied:62, price:15, depth:2, amen:["Électricité","Eau"] },
+  // ---- Loire-Atlantique (Bretagne historique) ----
+  { id:"la-baule", name:"La Baule", kind:"port", lat:47.278, lon:-2.393, desc:"Belle station, marina au cœur de la baie.", places:200, occupied:158, price:22, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"] },
+  { id:"pouliguen", name:"Le Pouliguen", kind:"port", lat:47.328, lon:-2.427, desc:"Petit port du fond de la baie, patrie des huîtres de la Brière.", places:180, occupied:137, price:20, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"croisic", name:"Le Croisic", kind:"port", lat:47.291, lon:-2.510, desc:"Port medieval du traict, Océarium et petits ports de pêche.", places:160, occupied:121, price:18, depth:3, amen:["Électricité","Eau","Douche","Carburant"] },
+  { id:"piriac", name:"Piriac-sur-Mer", kind:"port", lat:47.423, lon:-2.452, desc:"Village de granit rose de la côte de Guérande.", places:120, occupied:89, price:16, depth:3, amen:["Électricité","Eau","Douche"] },
+  { id:"turballe", name:"La Turballe", kind:"port", lat:47.341, lon:-2.514, desc:"Port sardinier, cale de mise à l'eau complète.", places:150, occupied:112, price:17, depth:4, amen:["Électricité","Eau","Douche","Carburant"] },
+  { id:"mesquer", name:"Mesquer (Kercabellec)", kind:"port", lat:47.418, lon:-2.498, desc:"Au bord de la mer de Mesquer, accès à la baie à marée haute.", places:90, occupied:67, price:15, depth:3, amen:["Électricité","Eau"] },
+  { id:"pornichet", name:"Pornichet", kind:"port", lat:47.259, lon:-2.352, desc:"Trois plages et un port de plaisance moderne de 240 places.", places:240, occupied:189, price:21, depth:3, amen:["Électricité","Eau","Douche","Carburant","Wi-Fi"] },
+  { id:"saint-nazaire", name:"Saint-Nazaire (plaisance)", kind:"port", lat:47.269, lon:-2.208, desc:"Au pied du pont de Saint-Nazaire, port en eau profonde.", places:300, occupied:233, price:22, depth:5, amen:["Électricité","Eau","Douche","Carburant","Grue"] },
+  { id:"pornic", name:"Pornic", kind:"port", lat:47.112, lon:-2.094, desc:"Bourg médiéval, château sur le port, ambiance douce de la côte de Jade.", places:180, occupied:141, price:19, depth:3, amen:["Électricité","Eau","Douche","Wi-Fi","Commerces"] },
+];
+
+let GROUPS = [
+  { id:"g1", name:"Les Potos du Trégor", type:"amis", port:"treguier", joined:false, members:[["Yann","Muscadet","Tréguier"],["Soaz","Écume de mer","Paimpol"],["Loïc","Wizz","Lézardrieux"]] },
+  { id:"g2", name:"Habitués de Saint-Malo", type:"port", port:"saint-malo", joined:false, members:[["Gwenael","Avel","Saint-Malo"],["Marie","Dour-Dour","Saint-Malo"],["Pierre","L'Apero","Dinard"]] },
+  { id:"g3", name:"Cotres classiques Iroise", type:"bateaux", port:"douarnenez", joined:false, members:[["Ronan","You You V","Douarnenez"],["Nael","Sylvanie","Camaret"]] },
+  { id:"g4", name:"Catamarans du Morbihan", type:"bateaux", port:"vannes", joined:false, members:[["Claire","Lagoon 380","Vannes"],["Thierry","Nautitech","Port Navalo"]] },
+  { id:"g5", name:"Équipage de Groix", type:"port", port:"port-tudy", joined:false, members:[["Sylvain","Penn-ar-Bed","Port-Tudy"]] },
+];
+let USER_REVIEWS = {};
+let BOOKINGS = [];
+
+const WFILES = [
+  { key:"cote", name:"Bulletin Côte (Météo-France)", desc:"Prévisions vent, mer et visibilité par zones côtières", url:"https://meteofrance.com/meteo-marine/bulletin-cote", tag:"Gratuit" },
+  { key:"large", name:"Bulletin Large (Météo-France)", desc:"Zones Ouessant / Sole, pour le grand large", url:"https://meteofrance.com/meteo-marine/bulletin-large", tag:"Gratuit" },
+  { key:"marees", name:"Horaires de marée (SHOM)", desc:"Marées officielles, coefficients et hauteurs d'eau", url:"https://maree.shom.fr", tag:"Gratuit" },
+  { key:"windy", name:"Windy", desc:"Cartes vent, houle et rafales interactives", url:"https://www.windy.com", tag:"App" },
+  { key:"pw", name:"PredictWind", desc:"GRIB haute résolution, routage et polaires", url:"https://www.predictwind.com", tag:"Premium" },
+  { key:"sailgrib", name:"SailGrib WR", desc:"Téléchargement GRIB offline + routage", url:"https://www.sailgrib.com", tag:"App" },
+  { key:"opencpn", name:"OpenCPN", desc:"Navigation et pilotage, cartes gratuites", url:"https://opencpn.org", tag:"Logiciel" },
+];
+
+// ================== MÉTÉO : MODÈLES + VENT SUR LA CARTE ==================
+// step = maille de la grille de flèches (°) selon la résolution du modèle
+const MODELS = [
+  { id:"arome", label:"AROME HD — Météo-France", m:"meteofrance_arome_seamless", step:0.10 },
+  { id:"icon",  label:"ICON — DWD (Allemagne)", m:"icon_seamless", step:0.15 },
+  { id:"gfs",   label:"GFS — NOAA (États-Unis)", m:"gfs_seamless", step:0.25 },
+  { id:"ifs",   label:"IFS — CEP (Reading)", m:"ecmwf_ifs025", step:0.25 },
+  { id:"sim",   label:"Simulation locale (hors-ligne)", m:null, step:0.30 },
+];
+const compass = (d) => ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"][Math.round((d%360)/22.5)%16];
+const wcolor = (s) => s<10?"#22c55e":s<21?"#a3e635":s<28?"#facc15":s<34?"#fb923c":"#ef4444";
+const METEO = { model:"arome", point:{lat:48.381, lon:-4.498, name:"Brest (Moulin Blanc)"}, data:null, grid:null, hour:0, loading:false, tide:null, tideKey:"" };
+let windLayers = [], meteoMarker = null;
+
+async function fetchMeteoPoint(lat, lon, m) {
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+    `&wind_speed_unit=kn&timezone=auto&forecast_days=3` + (m ? `&models=${m}` : "");
+  const r = await fetch(u); if (!r.ok) throw new Error("http");
+  const j = await r.json();
+  return { times:j.hourly.time, wind:j.hourly.wind_speed_10m, dir:j.hourly.wind_direction_10m,
+           gust:j.hourly.wind_gusts_10m, temp:j.hourly.temperature_2m, prec:j.hourly.precipitation, ok:true };
+}
+async function fetchWindGrid(mod) {
+  const step = mod.step || 0.25;
+  const coords = [];
+  for (let la = 47.2; la <= 49.201; la += step) for (let lo = -5.4; lo <= -1.399; lo += step) coords.push([+la.toFixed(3), +lo.toFixed(3)]);
+  const url = (ch) => `https://api.open-meteo.com/v1/forecast?latitude=${ch.map(p=>p[0]).join(",")}&longitude=${ch.map(p=>p[1]).join(",")}` +
+    `&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn&forecast_days=3` + (mod.m ? `&models=${mod.m}` : "");
+  const CH = 50, chunks = [];
+  for (let i = 0; i < coords.length; i += CH) chunks.push(coords.slice(i, i + CH));
+  const res = await Promise.all(chunks.map(ch => fetch(url(ch)).then(r => { if (!r.ok) throw new Error("http"); return r.json(); })));
+  const pts = [];
+  chunks.forEach((ch, ci) => (Array.isArray(res[ci]) ? res[ci] : [res[ci]]).forEach((item, k) => {
+    pts.push({ lat:ch[k][0], lon:ch[k][1], wind:item.hourly.wind_speed_10m, dir:item.hourly.wind_direction_10m, times:item.hourly.time });
+  }));
+  return { pts, ok:true, step };
+}
+function simPoint(lat, lon, tag) {
+  const seed = Math.abs(lat*7 + lon*3 + tag.length*13);
+  const times = [], wind = [], dir = [], gust = [], temp = [], prec = [];
+  const now = new Date(); now.setMinutes(0,0,0);
+  for (let i = 0; i < 72; i++) {
+    times.push(locStamp(new Date(now.getTime() + i * 36e5)));
+    const s = 0.5 + 0.5*Math.sin(i/9 + seed%7);
+    wind.push(Math.round(6 + 16*s)); gust.push(Math.round(8 + 22*s));
+    dir.push(Math.round((seed*37 + i*3) % 360));
+    temp.push(Math.round(11 + 7*Math.sin(i/12 + seed%3)));
+    prec.push((seed+i) % 23 === 0 ? 0.4 : 0);
+  }
+  return { times, wind, dir, gust, temp, prec, ok:false };
+}
+function simGrid(mod) {
+  const step = mod.step || 0.3, pts = [];
+  for (let la = 47.2; la <= 49.201; la += step) for (let lo = -5.4; lo <= -1.399; lo += step) {
+    const p = simPoint(la, lo, mod.id);
+    pts.push({ lat:+la.toFixed(3), lon:+lo.toFixed(3), wind:p.wind, dir:p.dir, times:p.times });
+  }
+  return { pts, ok:false, step };
+}
+// ---- Marées : modèle marin Open-Meteo (hauteur d'eau MSL) + simulation ----
+async function fetchTide(lat, lon) {
+  const u = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}` +
+    `&hourly=sea_level_height_msl&forecast_days=3&timezone=auto`;
+  const r = await fetch(u); if (!r.ok) throw new Error("http");
+  const j = await r.json();
+  const v = (j && j.hourly && j.hourly.sea_level_height_msl) || [];
+  if (!v.length || v.every(x => x === null)) throw new Error("nodata");
+  return { times:j.hourly.time, vals:v.map(x => x === null ? 0 : +x), ok:true };
+}
+function simTide(lat, lon) {
+  const amp = 2.2 + (lat - 47.2) * 4.2; // marnage croissant vers la Manche
+  const phase = ((lon * 7 + lat * 13) % 12.42 + 12.42) % 12.42;
+  const now = new Date(); now.setMinutes(0, 0, 0);
+  const times = [], vals = [];
+  for (let i = 0; i < 72; i++) {
+    const d = new Date(now.getTime() + i * 36e5);
+    times.push(locStamp(d));
+    const h = (d.getTime() / 36e5) % 12.42;
+    const spring = 1 + 0.14 * Math.cos(2 * Math.PI * ((d.getTime() / 864e5) % 14.77) / 14.77);
+    vals.push(+(amp * spring * Math.cos(2 * Math.PI * (h - phase) / 12.42)).toFixed(2));
+  }
+  return { times, vals, ok:false };
+}
+// horodatage local "YYYY-MM-DDTHH:mm" (cohérent avec l'API timezone=auto)
+const locStamp = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+function tideExtremes(times, vals) {
+  const ex = [];
+  for (let i = 1; i < vals.length - 1; i++) {
+    if (vals[i] >= vals[i-1] && vals[i] >= vals[i+1] && vals[i] > vals[i-1]) ex.push({ i, t:times[i], v:vals[i], type:"haute" });
+    else if (vals[i] <= vals[i-1] && vals[i] <= vals[i+1] && vals[i] < vals[i-1]) ex.push({ i, t:times[i], v:vals[i], type:"basse" });
+  }
+  return ex;
+}
+async function loadMeteoPoint() {
+  const m = MODELS.find(x => x.id === METEO.model);
+  const key = METEO.point.lat + "," + METEO.point.lon;
+  if (METEO.tideKey !== key) {
+    METEO.tideKey = key; METEO.tide = null;
+    fetchTide(METEO.point.lat, METEO.point.lon)
+      .then(t => { METEO.tide = t; if (TAB === "meteo") renderPanel(); })
+      .catch(() => { METEO.tide = simTide(METEO.point.lat, METEO.point.lon); if (TAB === "meteo") renderPanel(); });
+  }
+  METEO.loading = true; renderPanel();
+  try { METEO.data = await fetchMeteoPoint(METEO.point.lat, METEO.point.lon, m.m); }
+  catch (e) { METEO.data = simPoint(METEO.point.lat, METEO.point.lon, METEO.model); }
+  METEO.loading = false; renderPanel();
+}
+async function showWindOnMap() {
+  const m = MODELS.find(x => x.id === METEO.model);
+  try { METEO.grid = await fetchWindGrid(m); }
+  catch (e) { METEO.grid = simGrid(m); }
+  drawWindArrows(); renderPanel();
+}
+function clearWind() { windLayers.forEach(l => map.removeLayer(l)); windLayers = []; renderPanel(); }
+function drawWindArrows() {
+  clearWind(); if (!METEO.grid) return;
+  METEO.grid.pts.forEach(p => {
+    const h = Math.min(METEO.hour, p.wind.length - 1);
+    const s = p.wind[h], d = p.dir[h];
+    const len = 18 + s*1.4, col = wcolor(s);
+    const icon = L.divIcon({ className:"", iconSize:[len,16], html:
+      `<div style="transform:rotate(${d+90}deg);transform-origin:center;width:${len}px;height:16px;display:flex;align-items:center;justify-content:center">` +
+      `<svg width="${len}" height="16" viewBox="0 0 ${len} 16"><line x1="0" y1="8" x2="${len-7}" y2="8" stroke="${col}" stroke-width="3"/>` +
+      `<polygon points="${len-7},2 ${len},8 ${len-7},14" fill="${col}"/></svg></div>` });
+    const mk = L.marker([p.lat, p.lon], { icon }).addTo(map);
+    mk.bindPopup(`<b>${s} kt ${compass(d)}</b><br>${METEO.grid.ok ? "Données réelles (Open-Meteo)" : "⚠️ Simulation — pas d'accès réseau"}<br>${p.times[h].replace("T"," ")}`);
+    windLayers.push(mk);
+  });
+}
+function setMeteoMarker(lat, lon) {
+  if (meteoMarker) map.removeLayer(meteoMarker);
+  meteoMarker = L.circleMarker([lat, lon], { radius:8, color:"#fff", fillColor:"#f472b6", fillOpacity:1 })
+    .addTo(map).bindTooltip("Point météo");
+}
+
+// ================== OUTILS ==================
+const $ = (s) => document.querySelector(s);
+const seeded = (s) => { let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))%99991; return (n)=>((Math.sin(h*12.9898+n*78.233)*43758.5453)%1+1)%1; };
+const weather = (id) => { const r=seeded(id); return { wind:Math.round(4+r(1)*28), gust:Math.round(8+r(2)*34), dir:["N","NE","E","SE","S","SO","O","NO"][Math.floor(r(3)*8)], swell:(r(4)*2.5).toFixed(1), air:Math.round(11+r(5)*12), sea:Math.round(10+r(6)*9), rel:Math.round(55+r(7)*44) }; };
+const abriState = (s, w) => { if (s.exp) { const hit = s.exp.split(",").includes(w.dir); return { ok:!hit, txt:(hit?"⚠️ Exposé":"✔ Abri correct")+" (vent de "+w.dir+")", det:hit?("Vent de "+w.dir+" : secteur exposé ("+s.exp+")"):"Vent de "+w.dir+" : abrité (exposé "+s.exp+")" }; } return { ok:w.rel>55, txt:w.rel>75?"✔ Abri fiable":w.rel>55?"✔ Abri correct":"⚠️ Exposé", det:"Fiabilité générale : "+w.rel+"%" }; };
+const zone = (lon) => lon > -3 ? "Brehat / Fromentine" : lon > -4.3 ? "Penmarc'h" : "Ouessant";
+const eta = (d, s) => { if (!d || !s) return "—"; const h = d / s, j = Math.floor(h / 24), r = h % 24;
+  return j > 0 ? j + " j " + Math.floor(r) + " h" : Math.floor(h) + " h " + String(Math.round((h % 1) * 60)).padStart(2, "0") + " min"; };
+const hav = (a,b) => { const R=3440, dLa=(b.lat-a.lat)*Math.PI/180, dLo=(b.lon-a.lon)*Math.PI/180,
+  h=Math.sin(dLa/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLo/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h))); };
+const allRev = (s) => [...(s.rev||[]).map(r=>({user:r[0],stars:r[1],text:r[2],date:r[3]})), ...(USER_REVIEWS[s.id]||[])];
+const avg = (s) => { const r=allRev(s); return r.length ? (r.reduce((a,x)=>a+x.stars,0)/r.length).toFixed(1) : "—"; };
+const esc = (t) => String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ================== ROUTAGE (graphe maritime) ==================
+// Polygone terre détaillé (lat, lon) — un seul tour de côte du continent breton.
+// Précision ~1-2 km : corsen, rade de Brest, Crozon, Douarnenez, Raz, Audierne,
+// Penmarc'h, Concarneau, Lorient, Gâvres, baie de Quiberon, Rhuys, Vilaine, Manche.
+const COAST = [
+  [48.596,-4.830],[48.574,-4.786],[48.552,-4.760],[48.450,-4.780],[48.400,-4.772],[48.364,-4.766],[48.317,-4.800],
+  [48.310,-4.730],[48.342,-4.644],[48.360,-4.560],[48.398,-4.505],[48.430,-4.430],
+  [48.360,-4.510],[48.300,-4.470],[48.296,-4.435],[48.288,-4.390],[48.290,-4.300],
+  [48.280,-4.370],[48.276,-4.441],[48.270,-4.530],[48.276,-4.585],[48.283,-4.608],[48.278,-4.626],
+  [48.245,-4.663],[48.234,-4.606],
+  [48.210,-4.550],[48.205,-4.450],[48.220,-4.360],[48.236,-4.327],
+  [48.200,-4.330],[48.150,-4.370],[48.100,-4.440],[48.070,-4.500],[48.040,-4.660],[48.038,-4.744],[48.046,-4.769],
+  [48.020,-4.700],[48.000,-4.620],[48.030,-4.570],[48.020,-4.500],[48.012,-4.400],[48.000,-4.320],
+  [47.900,-4.350],[47.820,-4.370],[47.800,-4.300],[47.810,-4.240],[47.830,-4.210],[47.870,-4.190],
+  [47.899,-4.167],[47.920,-4.160],[47.880,-4.080],[47.870,-3.990],[47.838,-3.919],[47.830,-3.860],[47.840,-3.750],
+  [47.800,-3.620],[47.730,-3.440],
+  [47.698,-3.377],[47.707,-3.353],[47.688,-3.342],[47.662,-3.285],[47.648,-3.255],
+  [47.634,-3.234],[47.593,-3.082],[47.586,-3.028],[47.530,-2.945],
+  [47.585,-2.865],[47.607,-2.845],[47.656,-2.758],[47.610,-2.740],
+  [47.545,-2.780],[47.522,-2.862],
+  [47.495,-2.790],[47.465,-2.720],[47.470,-2.640],[47.490,-2.560],[47.527,-2.530],[47.517,-2.452],
+  [47.530,-2.360],[47.900,-2.200],[48.300,-2.050],[48.649,-2.026],
+  [48.632,-2.036],[48.640,-2.080],[48.625,-2.170],[48.632,-2.252],[48.630,-2.340],[48.681,-2.394],
+  [48.601,-2.462],[48.626,-2.457],[48.568,-2.545],[48.550,-2.620],[48.575,-2.720],[48.643,-2.845],
+  [48.600,-2.980],[48.626,-3.048],[48.670,-3.110],
+  [48.740,-3.120],[48.815,-3.003],[48.830,-3.100],[48.830,-3.150],
+  [48.760,-3.300],[48.720,-3.440],[48.675,-3.475],
+  [48.660,-3.550],[48.698,-3.618],[48.672,-3.919],[48.700,-3.945],[48.727,-3.985],
+  [48.730,-4.100],[48.660,-4.250],[48.590,-4.350],[48.550,-4.500],[48.530,-4.633],[48.552,-4.720],
+];
+// Îles approximées par des cercles (lat, lon, rayon en milles)
+function circlePoly(c) {
+  const pts = [];
+  for (let a = 0; a < 12; a++) {
+    const t = (a / 12) * 2 * Math.PI;
+    pts.push([c[0] + (c[2] / 60) * Math.sin(t), c[1] + (c[2] / (60 * Math.cos(c[0] * Math.PI / 180))) * Math.cos(t)]);
+  }
+  return pts;
+}
+const ISLANDS_LL = [
+  [48.460,-5.092,4],[48.400,-4.950,1.8],[48.744,-3.982,1.5],[48.833,-3.010,2.5],[48.040,-4.861,1.6],
+  [47.640,-3.474,3.5],[47.388,-2.904,1.3],[47.310,-3.155,5],[47.440,-2.825,1.0],
+];
+// Presqu'île de Guérande (nord de la Loire) + Côte de Jade (sud de la Loire)
+const RETZ = [
+  [47.530,-2.360],[47.510,-2.420],[47.470,-2.500],[47.440,-2.520],[47.400,-2.490],[47.354,-2.544],
+  [47.310,-2.490],[47.309,-2.476],[47.295,-2.344],[47.274,-2.352],[47.283,-2.390],
+  [47.250,-2.348],[47.272,-2.214],[47.290,-2.160],[47.360,-2.170],[47.440,-2.240],
+];
+const JADE = [
+  [47.268,-2.165],[47.225,-2.105],[47.160,-2.075],[47.110,-2.090],[47.118,-2.248],
+  [47.160,-2.290],[47.220,-2.250],[47.262,-2.185],
+];
+// Bloc terrestre à l'est (marais de Dol, Normandie, Vendée)
+const EAST = [
+  [47.500,-0.850],[47.500,-2.300],[47.530,-2.350],[47.900,-2.190],[48.300,-2.040],[48.650,-2.010],
+  [49.700,-2.010],[49.700,-0.850],
+];
+const LAND = [COAST, RETZ, JADE, EAST].concat(ISLANDS_LL.map(circlePoly));
+function pip(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function segX(a, b, c, d) {
+  const o = (p, q, r) => { const v = (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0]); return v === 0 ? 0 : v > 0 ? 1 : 2; };
+  return o(a,b,c) !== o(a,b,d) && o(c,d,a) !== o(c,d,b);
+}
+function crossCount(a, b, skipMid) {
+  let n = 0;
+  for (const poly of LAND) for (let i = 0, j = poly.length - 1; i < poly.length; j = i++)
+    if (segX(a, b, poly[j], poly[i])) n++;
+  if (!skipMid) { const mid = [(a[0]+b[0])/2, (a[1]+b[1])/2]; for (const poly of LAND) if (pip(mid, poly)) n++; }
+  return n;
+}
+function distNM(a, b) {
+  const R = 3440, dLa = (b[0]-a[0])*Math.PI/180, dLo = (b[1]-a[1])*Math.PI/180;
+  const h = Math.sin(dLa/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLo/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+// ---- Grille terre/mer + A* : route la plus courte évitant la terre ----
+// Grille fine : cellules de ~0.9 × 0.6 nm
+const GRID = { dLat: 0.015, dLon: 0.015, minLat: 47.0, maxLat: 49.6, minLon: -5.7, maxLon: -0.9 };
+const NX = Math.round((GRID.maxLon - GRID.minLon) / GRID.dLon);
+const NY = Math.round((GRID.maxLat - GRID.minLat) / GRID.dLat);
+let LANDG = null;
+function cellCenter(cx, cy) { return [GRID.minLat + (cy + 0.5) * GRID.dLat, GRID.minLon + (cx + 0.5) * GRID.dLon]; }
+function landGrid() {
+  if (LANDG) return LANDG;
+  const t0 = Date.now();
+  LANDG = new Uint8Array(NX * NY);
+  const bbs = LAND.map(poly => {
+    const b = [99, 99, -99, -99];
+    for (const p of poly) { b[0] = Math.min(b[0], p[0]); b[1] = Math.min(b[1], p[1]); b[2] = Math.max(b[2], p[0]); b[3] = Math.max(b[3], p[1]); }
+    return b;
+  });
+  for (let cy = 0; cy < NY; cy++) for (let cx = 0; cx < NX; cx++) {
+    const c = cellCenter(cx, cy);
+    for (let k = 0; k < LAND.length; k++) {
+      const b = bbs[k];
+      if (c[0] < b[0] || c[0] > b[2] || c[1] < b[1] || c[1] > b[3]) continue;
+      if (pip(c, LAND[k])) { LANDG[cx * NY + cy] = 1; break; }
+    }
+  }
+  // marge de sécurité : cellules traversées par un bord de côte = terre
+  for (let k = 0; k < LAND.length; k++) {
+    const poly = LAND[k];
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a1 = poly[j], a2 = poly[i];
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(a2[0] - a1[0]) / GRID.dLat, Math.abs(a2[1] - a1[1]) / GRID.dLon) * 2));
+      for (let s = 0; s <= steps; s++) {
+        const la = a1[0] + (a2[0] - a1[0]) * s / steps, lo = a1[1] + (a2[1] - a1[1]) * s / steps;
+        const cx = Math.min(NX - 1, Math.max(0, Math.floor((lo - GRID.minLon) / GRID.dLon)));
+        const cy = Math.min(NY - 1, Math.max(0, Math.floor((la - GRID.minLat) / GRID.dLat)));
+        LANDG[cx * NY + cy] = 1;
+      }
+    }
+  }
+  console.log("grille terre/mer " + NX + "×" + NY + " en " + (Date.now() - t0) + " ms");
+  return LANDG;
+}
+// un tronçon est "clean" s'il ne coupe aucune côte/île et ne survole jamais la terre
+function lineClear(a, b) {
+  if (crossCount(a, b, true) > 0) return false;
+  const n = Math.max(2, Math.ceil(distNM(a, b) / 0.5));
+  for (let i = 1; i < n; i++) {
+    const p = [a[0] + (b[0]-a[0]) * i / n, a[1] + (b[1]-a[1]) * i / n];
+    for (const poly of LAND) if (pip(p, poly)) return false;
+  }
+  return true;
+}
+function astarPath(start, end) {
+  const g = landGrid();
+  const toCell = (p) => [Math.min(NX-1, Math.max(0, Math.floor((p[1]-GRID.minLon)/GRID.dLon))), Math.min(NY-1, Math.max(0, Math.floor((p[0]-GRID.minLat)/GRID.dLat)))];
+  let [scx, scy] = toCell(start), [ecx, ecy] = toCell(end);
+  const snap = (cx, cy) => {
+    if (!g[cx*NY+cy]) return [cx, cy];
+    for (let r = 1; r < 25; r++) for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = cx+dx, y = cy+dy;
+      if (x >= 0 && x < NX && y >= 0 && y < NY && !g[x*NY+y]) return [x, y];
+    }
+    return [cx, cy];
+  };
+  [scx, scy] = snap(scx, scy); [ecx, ecy] = snap(ecx, ecy);
+  const N = NX * NY, INF = 1e18;
+  const dist = new Float64Array(N).fill(INF), prev = new Int32Array(N).fill(-1), done = new Uint8Array(N);
+  const sIdx = scx*NY+scy, eIdx = ecx*NY+ecy;
+  if (sIdx === eIdx) return [start, end];
+  const eC = cellCenter(ecx, ecy);
+  const hEst = (x, y) => distNM(cellCenter(x, y), [end[0], end[1]]);
+  dist[sIdx] = 0;
+  // tas binaire de cellules, trié par coût estimé (f = g + h)
+  const heap = [], hkey = new Float64Array(N).fill(INF);
+  const push = (idx, f) => { heap.push([f, idx]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2*i+1, r = l+1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  push(sIdx, hEst(scx, scy)); hkey[sIdx] = hEst(scx, scy);
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  let found = false;
+  while (heap.length) {
+    const [f, u] = pop();
+    if (done[u]) continue;
+    done[u] = 1;
+    if (u === eIdx) { found = true; break; }
+    const ux = Math.floor(u / NY), uy = u % NY, up = cellCenter(ux, uy);
+    for (const [dx, dy] of dirs) {
+      const x = ux + dx, y = uy + dy;
+      if (x < 0 || x >= NX || y < 0 || y >= NY) continue;
+      const v = x * NY + y;
+      if (g[v] || done[v]) continue;
+      if (dx !== 0 && dy !== 0 && (g[(ux+dx)*NY+uy] || g[ux*NY+(uy+dy)])) continue; // pas de coupe de coin par la terre
+      const d = dist[u] + distNM(up, cellCenter(x, y));
+      if (d < dist[v]) {
+        dist[v] = d; prev[v] = u;
+        const fv = d + hEst(x, y);
+        if (fv < hkey[v]) { hkey[v] = fv; push(v, fv); }
+      }
+    }
+  }
+  if (!found || dist[eIdx] >= INF) return null;
+  const cells = []; let c = eIdx;
+  while (c !== -1) { cells.unshift(c); c = prev[c]; }
+  return cells.map(idx => cellCenter(Math.floor(idx / NY), idx % NY));
+}
+// lissage : saut direct au point le plus lointain encore en eau (recherche binaire)
+function smoothPath(pts) {
+  const out = [pts[0]]; let i = 0;
+  while (i < pts.length - 1) {
+    let lo = i + 1, hi = pts.length - 1, best = i + 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lineClear(pts[i], pts[mid])) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    out.push(pts[best]); i = best;
+  }
+  return out;
+}
+function shortestSeaPath(start, end) {
+  if (lineClear(start, end)) {
+    return { pts: [start, end], dist: Math.round(distNM(start, end)), ok: false, names: ["Départ", "Arrivée"] };
+  }
+  const raw = astarPath(start, end);
+  if (!raw) return { pts: [start, end], dist: Math.round(distNM(start, end)), ok: false, names: ["Départ", "Arrivée"] };
+  const sm = smoothPath(raw);
+  // extrémités : si le marqueur du port est en terre (grille), partir/arriver de la cellule de mer la plus proche
+  const first = sm.length > 1 ? sm[1] : sm[0], last = sm.length > 1 ? sm[sm.length - 2] : sm[sm.length - 1];
+  const p0 = lineClear(start, first) ? start : sm[0];
+  const pN = lineClear(last, end) ? end : sm[sm.length - 1];
+  const pts = [p0].concat(sm.slice(1, sm.length - 1), [pN]);
+  if (pts.length === 2 && !lineClear(pts[0], pts[1])) return sm;
+  let d = 0; for (let i = 1; i < pts.length; i++) d += distNM(pts[i-1], pts[i]);
+  const names = pts.map((_, i) => i === 0 ? "Départ" : i === pts.length - 1 ? "Arrivée" : "Waypoint");
+  return { pts, dist: Math.round(d), ok: true, names };
+}
+function routeDistNM(pts) { let d = 0; for (let i = 1; i < pts.length; i++) d += distNM(pts[i-1], pts[i]); return d; }
+
+// ================== ÉTAT ==================
+let TAB = "navily", SEL = null, SEARCH = "", ROUTE = { from:"saint-malo", to:"camaret" };
+let RMODE = "auto"; // "auto" | "manual"
+let SPEED = 6; // vitesse du bateau en nœuds
+const MANUAL = { on:false, pts:[] };
+const ROUTE_INFO = { dist:null };
+let BOOK = { step:"profile", nights:2, loa:10, card:"", name:"", paid:false };
+let map, markers = {}, routeLayers = [], manualLayers = [];
+function togglePanel() {
+  $("#left").classList.toggle("hidden");
+  setTimeout(() => { if (map) map.invalidateSize(); }, 60);
+}
+
+// ================== CARTE ==================
+function initMap() {
+  map = L.map("map", { center:[48.3,-3.2], zoom:8, zoomControl:true });
+  if (window.innerWidth < 900) $("#left").classList.add("hidden"); // panneau replié par défaut sur mobile
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"© OpenStreetMap" });
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom:18, attribution:"Imagerie © Esri, Maxar" });
+  const seamark = L.tileLayer("https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", { maxZoom:18, attribution:"Balises © OpenSeaMap" });
+  sat.addTo(map); seamark.addTo(map);
+  L.control.layers({ "Plan OSM": osm, "Satellite": sat }, { "⚓ Balises OpenSeaMap": seamark }).addTo(map);
+  L.control.scale({ metric:true }).addTo(map);
+
+  SPOTS.forEach(s => {
+    const icon = L.divIcon({ className:"", html:
+      `<div style="transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;border:2px solid #0f172a;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:11px;background:${s.kind==="port"?"#06b6d4":"#f59e0b"}">${s.kind==="port"?"⚓":"🌊"}</div>`,
+      iconSize:[22,22] });
+    const m = L.marker([s.lat,s.lon], { icon }).addTo(map);
+    m.bindPopup(`<b>${esc(s.name)}</b><br><span style="font-size:12px">${s.kind==="port"?(s.places-s.occupied)+" places libres · "+s.price+"€/nuit":"Mouillage · "+s.depth+" m"}</span><br><a href="#" onclick="selectSpot('${s.id}');return false;"><b>Ouvrir la fiche →</b></a>`);
+    m.bindTooltip(esc(s.name), { permanent:true, direction:"top", className:"portlabel", offset:[0,-12] });
+    markers[s.id] = m;
+    m.on("click", () => selectSpot(s.id, false));
+  });
+  map.on("zoomend", () => { document.getElementById("map").classList.toggle("zoomed", map.getZoom() >= 12); });
+  map.on("click", e => {
+    if (RMODE === "manual" && MANUAL.on) {
+      MANUAL.pts.push([+e.latlng.lat.toFixed(4), +e.latlng.lng.toFixed(4)]);
+      redrawManualRoute(); renderPanel();
+    }
+    else if (TAB === "meteo") {
+      METEO.point = { lat:+e.latlng.lat.toFixed(4), lon:+e.latlng.lng.toFixed(4), name:"Point sélectionné sur la carte" };
+      setMeteoMarker(METEO.point.lat, METEO.point.lon);
+      loadMeteoPoint();
+    }
+  });
+}
+function focusSpot(s) { map.flyTo([s.lat, s.lon], 13, { duration: .8 }); }
+function selectSpot(id, fly=true) {
+  SEL = id; BOOK = { ...BOOK, step:"profile", paid:false };
+  const s = SPOTS.find(x=>x.id===id);
+  if (fly) focusSpot(s);
+  renderPanel(); renderDrawer();
+}
+
+// ================== PANNEAU GAUCHE ==================
+function renderPanel() {
+  const p = $("#panel");
+  if (TAB === "navily") {
+    p.innerHTML = `<input id="search" placeholder="Rechercher un port, une crique…" value="${esc(SEARCH)}">` +
+      SPOTS.filter(s=>s.name.toLowerCase().includes(SEARCH.toLowerCase())).map(s => {
+        const w = weather(s.id);
+        const a = abriState(s, w);
+        return `<div class="card ${SEL===s.id?"sel":""}" style="cursor:pointer" onclick="selectSpot('${s.id}')">
+          <div class="row"><h3>${s.kind==="port"?"⚓":"🌊"} ${esc(s.name)}</h3><span class="stars">★ ${avg(s)}</span></div>
+          <div class="muted">${s.kind==="port" ? (s.places-s.occupied)+" places visiteurs · "+s.price+"€/nuit" : "Mouillage · "+s.depth+" m"} · ${w.dir} ${w.wind} kt · <span class="${a.ok?"ok":"bad"}">${a.ok?"✔ Abri":"⚠️ Exposé"}</span></div>
+        </div>`;
+      }).join("");
+    const inp = $("#search");
+    inp.oninput = () => { SEARCH = inp.value; renderPanel(); $("#search").focus(); };
+  }
+  else if (TAB === "meteo") {
+    if (!METEO.data && !METEO.loading) loadMeteoPoint();
+    const mod = MODELS.find(x => x.id === METEO.model);
+    const D = METEO.data;
+    const h = METEO.loading || !D ? 0 : Math.min(METEO.hour, D.wind.length - 1);
+    const rot = (d) => `display:inline-block;transform:rotate(${d+90}deg)`;
+    // ---- marées ----
+    const T = METEO.tide;
+    let tideHtml = `<p class="muted">Chargement des marées…</p>`;
+    if (T) {
+      const ex = tideExtremes(T.times, T.vals);
+      const nowIso = locStamp(new Date());
+      let idx = T.times.findIndex(t => t >= nowIso); if (idx < 0) idx = 0;
+      const nxt = ex.filter(e => e.i > idx).slice(0, 4);
+      const eHi = ex.find(e => e.type === "haute" && e.i > idx);
+      const eLo = ex.filter(e => e.type === "basse").reduce((a, b) => Math.abs(b.i - (eHi ? eHi.i : idx)) < Math.abs(a.i - (eHi ? eHi.i : idx)) ? b : a, ex.find(e => e.type === "basse") || { v: 0 });
+      const coeff = eHi ? Math.round(Math.abs(eHi.v - eLo.v) / 6.13 * 95) : null;
+      const maxA = Math.max(...T.vals.slice(idx, idx + 48).map(v => Math.abs(v)), 1);
+      const svg = T.vals.slice(idx, idx + 48).map((v, i) => `${(i * 300 / 47).toFixed(1)},${(34 - v / maxA * 28).toFixed(1)}`).join(" ");
+      tideHtml = `
+        <span class="chip ${T.ok ? "free" : "prem"}">${T.ok ? "Modèle marin (Open-Meteo)" : "⚠️ Simulation — pas d'accès réseau"}</span>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <span>Hauteur actuelle</span><b style="color:#38bdf8">${T.vals[idx].toFixed(2)} m</b>
+        </div>
+        ${coeff !== null ? `<div style="display:flex;justify-content:space-between"><span class="muted">Coefficient estimé</span><b>≈ ${coeff}</b></div>` : ""}
+        <svg viewBox="0 0 300 68" style="width:100%;height:68px;margin-top:8px">
+          <line x1="0" y1="34" x2="300" y2="34" stroke="#334155" stroke-dasharray="3 3"/>
+          <polyline points="${svg}" fill="none" stroke="#38bdf8" stroke-width="2"/>
+        </svg>
+        <p class="muted" style="font-size:10px;margin:2px 0 6px">Hauteur d'eau sur 48 h (référence MSL) — bleu = niveau moyen</p>
+        ${nxt.map(e => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #334155;font-size:12px">
+          <span>${e.type === "haute" ? "🌕" : "🌑"} Marée ${e.type}</span>
+          <span>${e.t.slice(8, 16).replace("T", " ")} · <b>${e.v.toFixed(2)} m</b> <span class="muted">(+${e.i - idx} h)</span></span>
+        </div>`).join("")}
+        <p class="muted" style="font-size:10px;margin-top:6px">Valeurs indicatives — vérifiez <a href="https://maree.shom.fr" target="_blank" rel="noopener" style="color:#38bdf8">maree.shom.fr</a> pour la navigation.</p>`;
+    }
+    p.innerHTML = `
+      <div class="card">
+        <h3>🌬️ Météo maritime</h3>
+        <p class="muted" style="margin:6px 0 4px">Modèle de prévision</p>
+        <select id="mModel">${MODELS.map(x => `<option value="${x.id}" ${x.id === METEO.model ? "selected" : ""}>${x.label}</option>`).join("")}</select>
+        <p class="muted" style="margin:8px 0 4px">Point GPS (port, crique… ou clic sur la carte)</p>
+        <select id="mSpot"><option value="">— Choisir un lieu —</option>${SPOTS.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>
+        <p class="muted" style="margin-top:8px" id="mCoords">📍 ${METEO.point.lat.toFixed(3)}°N ${Math.abs(METEO.point.lon).toFixed(3)}°W · ${esc(METEO.point.name)}</p>
+      </div>
+      ${METEO.loading || !D ? `<div class="card"><p class="muted">Chargement des prévisions pour ce point…</p></div>` : `
+      <div class="card">
+        <h3>${h === 0 ? "Conditions actuelles" : "Prévision"}</h3>
+        <span class="chip ${D.ok ? "free" : "prem"}">${D.ok ? mod.label : "⚠️ Simulation — pas d'accès réseau"}</span>
+        <div class="wgrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px">
+          <div><div class="muted" style="font-size:10px">VENT</div><div style="font-size:16px;font-weight:700;color:${wcolor(D.wind[h])}"><span style="${rot(D.dir[h])}">➤</span> ${Math.round(D.wind[h])} kt</div></div>
+          <div><div class="muted" style="font-size:10px">RAFALES</div><div style="font-size:16px;font-weight:700;color:#fbbf24">${Math.round(D.gust[h])} kt</div></div>
+          <div><div class="muted" style="font-size:10px">DIR.</div><div style="font-size:16px;font-weight:700;color:#22d3ee">${compass(D.dir[h])}</div></div>
+          <div><div class="muted" style="font-size:10px">AIR</div><div style="font-size:16px;font-weight:700">${D.temp[h]}°C</div></div>
+          <div><div class="muted" style="font-size:10px">PLUIE</div><div style="font-size:16px;font-weight:700">${D.prec[h]} mm</div></div>
+          <div><div class="muted" style="font-size:10px">HEURE</div><div style="font-size:12px;font-weight:700" id="mHourVal">${D.times[h].slice(5,16).replace("T"," ")} (+${h} h)</div></div>
+        </div>
+        <p class="muted" style="margin-top:10px;font-size:11px">Échéance : glissez pour explorer les 72 prochaines heures</p>
+        <input id="mHour" type="range" min="0" max="${Math.min(71, D.wind.length - 1)}" value="${h}" style="width:100%">
+      </div>
+      <div class="card"><h3>Prévisions horaires (24 h)</h3>
+        <div style="max-height:280px;overflow-y:auto">
+        ${D.wind.slice(0,24).map((w,i) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #334155">
+          <span class="muted" style="font-size:11px">${D.times[i].slice(8,16).replace("T"," ")}</span>
+          <span style="font-size:12px"><span style="${rot(D.dir[i])};color:${wcolor(w)}">➤</span> ${Math.round(w)} kt <span class="muted">(raf. ${Math.round(D.gust[i])}) ${compass(D.dir[i])}</span></span>
+        </div>`).join("")}
+        </div>
+      </div>`}
+      <div class="card"><h3>🌊 Marées — ${esc(METEO.point.name)}</h3>
+        ${tideHtml}
+      </div>
+      <div class="card"><h3>Carte du vent</h3>
+        <p class="muted" style="margin:4px 0">Force et direction du vent sur toute la Bretagne maritime, selon le modèle choisi (${mod.label}). Grille ${mod.step}° (~${Math.round(mod.step*60)} milles), soit jusqu'à ${Math.round(4.0/mod.step) * Math.round(2.0/mod.step)} flèches.</p>
+        <button class="btn" onclick="showWindOnMap()">🌬️ Afficher le vent sur la carte</button>
+        <button class="btn" style="background:#7f1d1d" onclick="clearWind()">Masquer les flèches</button>
+        ${METEO.grid ? `<p class="muted" style="margin-top:8px;font-size:11px">${METEO.grid.ok ? "✅ Données réelles" : "⚠️ Simulation"} · ${METEO.grid.pts.length} points · échéance +${METEO.hour} h (cliquez une flèche pour le détail)</p>` : ""}
+      </div>
+      <div class="card"><h3>Sources officielles</h3>
+        ${WFILES.map(f => `<div style="padding:5px 0;border-bottom:1px solid #334155"><a href="${f.url}" target="_blank" rel="noopener" style="color:#38bdf8">${f.name}</a><div class="muted" style="font-size:11px">${f.desc}</div></div>`).join("")}
+      </div>`;
+    $("#mModel").onchange = e => { METEO.model = e.target.value; METEO.data = null; loadMeteoPoint(); if (METEO.grid) showWindOnMap(); };
+    $("#mSpot").onchange = e => {
+      const s = SPOTS.find(x => x.id === e.target.value); if (!s) return;
+      METEO.point = { lat:s.lat, lon:s.lon, name:s.name };
+      setMeteoMarker(s.lat, s.lon); loadMeteoPoint();
+    };
+    const hh = $("#mHour");
+    if (hh) {
+      hh.oninput = ev => {
+        METEO.hour = +ev.target.value;
+        const D2 = METEO.data; if (!D2) return;
+        document.getElementById("mHourVal").textContent = D2.times[METEO.hour].slice(5,16).replace("T"," ") + " (+" + METEO.hour + " h)";
+        if (METEO.grid) drawWindArrows();
+      };
+      hh.onchange = () => renderPanel();
+    }
+  }
+  else if (TAB === "routage") {
+    if (RMODE === "auto" && ROUTE_INFO.dist === null) computeAutoRoute(false);
+    const dist = RMODE === "auto" ? ROUTE_INFO.dist : (MANUAL.pts.length >= 2 ? ROUTE_INFO.dist : null);
+    const lastLon = RMODE === "auto"
+      ? (SPOTS.find(x=>x.id===ROUTE.to)||{lon:-3.2}).lon
+      : (MANUAL.pts.length ? MANUAL.pts[MANUAL.pts.length-1][1] : -3.2);
+    const keys = ["cote","marees","windy"];
+    if (dist !== null) { if (dist>15) keys.push("sailgrib"); if (dist>30) keys.push("pw"); if (dist>55) keys.push("large","opencpn"); }
+    const files = WFILES.filter(f=>keys.includes(f.key));
+    p.innerHTML = `
+      <div class="card">
+        <h3>Planifier une route</h3>
+        <div class="mode">
+          <button class="${RMODE==="auto"?"active":""}" onclick="setMode('auto')">🤖 Auto — plus court par la mer</button>
+          <button class="${RMODE==="manual"?"active":""}" onclick="setMode('manual')">✏️ Manuel — waypoints</button>
+        </div>
+        <p class="muted" style="margin-top:10px">Vitesse du bateau (nœuds)</p>
+        <input id="bSpeed" type="number" min="0.5" max="30" step="0.5" value="${SPEED}">
+        ${RMODE === "auto" ? `
+        <p class="muted" style="margin:8px 0 4px">Départ</p>
+        <select id="rFrom">${SPOTS.map(s=>`<option value="${s.id}" ${s.id===ROUTE.from?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
+        <p class="muted" style="margin:6px 0 4px">Arrivée</p>
+        <select id="rTo">${SPOTS.map(s=>`<option value="${s.id}" ${s.id===ROUTE.to?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
+        <div class="row" style="margin-top:10px"><span class="muted">Distance (route mer)</span><b style="color:#22d3ee">${ROUTE_INFO.dist!==null?ROUTE_INFO.dist+" milles":"—"}</b></div>
+        <div class="row"><span class="muted">Durée estimée à ${SPEED} kt</span><b style="color:#34d399">${eta(ROUTE_INFO.dist,SPEED)}</b></div>
+        <div class="row"><span class="muted">Zone Météo-France</span><span style="font-size:12px">${zone(lastLon)}</span></div>
+        <button class="btn" onclick="computeAutoRoute();renderPanel()">Tracer la route sur la carte</button>`
+        : `
+        <p class="muted" style="margin:8px 0">${MANUAL.on?"Cliquez sur la carte pour poser vos waypoints, dans l'ordre.":"Activez la pose de waypoints, puis cliquez sur la carte."}</p>
+        <button class="btn" onclick="toggleManualPts()">${MANUAL.on?"⏸ Terminer la pose":"✏️ Poser mes waypoints"}</button>
+        <div class="row" style="margin-top:8px"><span class="muted">Waypoints posés</span><b style="color:#22d3ee">${MANUAL.pts.length}</b></div>
+        <div class="row"><span class="muted">Distance totale</span><b style="color:#22d3ee">${dist!==null?dist+" milles":"—"}</b></div>
+        <div class="row"><span class="muted">Durée estimée à ${SPEED} kt</span><b style="color:#34d399">${eta(dist,SPEED)}</b></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn" style="margin:0" onclick="undoManualPt()" ${MANUAL.pts.length?"":"disabled"}>↩ Dernier</button>
+          <button class="btn" style="margin:0;background:#7f1d1d" onclick="clearManual()" ${MANUAL.pts.length?"":"disabled"}>🗑 Effacer</button>
+        </div>`}
+      </div>
+      <div class="card"><h3>Fichiers météo recommandés</h3>
+        <p class="muted" style="margin:4px 0 8px">${dist===null?"Tracez une route pour obtenir les fichiers adaptés.":dist<=15?"Route courte : bulletins côtiers + marées suffisent.":dist<=55?"Route moyenne : ajoutez un GRIB haute résolution.":"Longue route : bulletins large + GRIB et routage conseillés."}</p>
+        ${files.map(f=>`<div style="border-top:1px solid #334155;padding:7px 0">
+          <div class="row"><a class="link" href="${f.url}" target="_blank" rel="noreferrer">${esc(f.name)} ↗</a>
+          <span class="chip ${f.tag==="Gratuit"?"free":f.tag==="Premium"?"prem":""}">${f.tag}</span></div>
+          <div class="muted">${esc(f.desc)}</div></div>`).join("")}
+      </div>
+      <div class="card"><h3>Météo actuelle</h3>
+        ${["saint-malo","roscoff","camaret","lorient","vannes"].map(id=>{const s=SPOTS.find(x=>x.id===id), w=weather(id);
+          return `<div class="row" style="padding:5px 0;border-bottom:1px solid #334155"><span style="font-size:12px">${esc(s.name)}</span><span class="muted">${w.dir} ${w.wind} kt (raf. ${w.gust}) · houle ${w.swell} m · ${w.air}°C</span></div>`}).join("")}
+      </div>`;
+    if (RMODE === "auto") {
+      $("#rFrom").onchange = e => { ROUTE.from = e.target.value; computeAutoRoute(); renderPanel(); };
+      $("#rTo").onchange = e => { ROUTE.to = e.target.value; computeAutoRoute(); renderPanel(); };
+    }
+    const sp = $("#bSpeed");
+    if (sp) sp.onchange = e => { SPEED = Math.max(0.5, Math.min(30, +e.target.value || 6)); renderPanel(); };
+  }
+  else {
+    p.innerHTML = `
+      <div class="card"><h3>Créer un groupe</h3>
+        <input id="gName" placeholder="Nom du groupe" style="margin-top:8px">
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <select id="gType"><option value="amis">Amis</option><option value="bateaux">Bateaux similaires</option><option value="port">Port d'attache</option></select>
+          <select id="gPort">${SPOTS.filter(s=>s.kind==="port").map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>
+        </div>
+        <button class="btn" onclick="createGroup()">+ Créer le groupe</button>
+      </div>
+      ${GROUPS.map(g=>`<div class="card">
+        <div class="row"><h3>${esc(g.name)}</h3>
+          <button class="chip ${g.joined?"free":""}" style="cursor:pointer;border:none" onclick="toggleJoin('${g.id}')">${g.joined?"✔ Membre":"Rejoindre"}</button></div>
+        <div class="muted">${g.type==="amis"?"Potes":g.type==="bateaux"?"Bateaux similaires":"Port d'attache"} · ${esc((SPOTS.find(s=>s.id===g.port)||{}).name||"")}</div>
+        ${g.members.map(m=>`<div style="font-size:12px;margin-top:4px">⛵ <b>${esc(m[0])}</b> · ${esc(m[1])} · ${esc(m[2])}</div>`).join("") || `<div class="muted" style="font-style:italic;margin-top:4px">Aucun membre — invitez vos équipiers !</div>`}
+      </div>`).join("")}`;
+  }
+}
+// ---- routage auto : plus court chemin par la mer ----
+function computeAutoRoute(drawIt = true) {
+  const A = SPOTS.find(s=>s.id===ROUTE.from), B = SPOTS.find(s=>s.id===ROUTE.to);
+  const path = shortestSeaPath([A.lat, A.lon], [B.lat, B.lon]);
+  ROUTE_INFO.dist = path.dist;
+  if (drawIt !== false) drawAutoRoute(path);
+}
+function drawAutoRoute(path) {
+  clearAutoRoute();
+  const pl = L.polyline(path.pts, { color:"#f59e0b", weight:2.5, dashArray:"8 6" }).addTo(map);
+  routeLayers.push(pl);
+  pl.bindTooltip((path.ok ? "Route la plus courte par la mer : " : "Route directe (mer dégagée) : ") + path.dist + " milles", { permanent:true, direction:"center" });
+  path.pts.forEach((p, i) => {
+    if (i === 0 || i === path.pts.length - 1) return;
+    const d = L.circleMarker(p, { radius:4, color:"#f59e0b", fillOpacity:.8 }).addTo(map);
+    d.bindTooltip((path.names && path.names[i]) || "Waypoint");
+    routeLayers.push(d);
+  });
+  map.fitBounds(pl.getBounds().pad(0.25));
+}
+function clearAutoRoute() { routeLayers.forEach(l => map.removeLayer(l)); routeLayers = []; }
+// ---- routage manuel : waypoints posés à la souris ----
+function redrawManualRoute() {
+  clearManualRoute();
+  if (MANUAL.pts.length >= 2) {
+    const pl = L.polyline(MANUAL.pts, { color:"#22d3ee", weight:2.5, dashArray:"8 6" }).addTo(map);
+    manualLayers.push(pl);
+    pl.bindTooltip(Math.round(routeDistNM(MANUAL.pts)) + " milles", { permanent:true, direction:"center" });
+    map.fitBounds(pl.getBounds().pad(0.25));
+  }
+  MANUAL.pts.forEach((p, i) => {
+    const m = L.circleMarker(p, { radius:6, color:"#0f172a", fillColor:"#22d3ee", fillOpacity:1 }).addTo(map);
+    m.bindTooltip("WP " + (i + 1));
+    manualLayers.push(m);
+  });
+  ROUTE_INFO.dist = MANUAL.pts.length >= 2 ? Math.round(routeDistNM(MANUAL.pts)) : null;
+}
+function clearManualRoute() { manualLayers.forEach(l => map.removeLayer(l)); manualLayers = []; }
+function setMode(m) {
+  if (RMODE !== m) { clearAutoRoute(); clearManualRoute(); ROUTE_INFO.dist = null; }
+  RMODE = m; MANUAL.on = false; updateBanner(); renderPanel();
+}
+function toggleManualPts() { MANUAL.on = !MANUAL.on; updateBanner(); renderPanel(); }
+function updateBanner() {
+  const b = document.getElementById("manBanner");
+  if (b) b.style.display = (RMODE === "manual" && MANUAL.on) ? "block" : "none";
+}
+function undoManualPt() { MANUAL.pts.pop(); redrawManualRoute(); renderPanel(); }
+function clearManual() { MANUAL.pts = []; ROUTE_INFO.dist = null; clearManualRoute(); renderPanel(); }
+function drawRoute() { if (RMODE === "auto") computeAutoRoute(); else { MANUAL.on = true; updateBanner(); renderPanel(); } }
+function createGroup() {
+  const n = $("#gName").value.trim(); if (!n) return;
+  GROUPS.push({ id:"g"+Date.now(), name:n, type:$("#gType").value, port:$("#gPort").value, joined:true, members:[] });
+  renderPanel();
+}
+function toggleJoin(id) { const g = GROUPS.find(x=>x.id===id); g.joined = !g.joined; renderPanel(); }
+
+// ================== DRAWER ==================
+function renderDrawer() {
+  const d = $("#drawer");
+  if (!SEL) { d.classList.remove("open"); d.innerHTML = ""; return; }
+  const s = SPOTS.find(x=>x.id===SEL);
+  d.classList.add("open");
+  const w = weather(s.id);
+  const a = abriState(s, w);
+  const revs = allRev(s);
+  const steps = ["profile","dispo","paiement","confirme"];
+  const stepBtn = (k,l) => `<button class="${BOOK.step===k?"active":""}" ${k==="confirme"&&!BOOK.paid?"disabled":""} onclick="BOOK.step='${k}';renderDrawer()">${l}</button>`;
+  d.innerHTML = `
+    <div class="drawer-head">
+      <h2>${s.kind==="port"?"⚓":"🌊"} ${esc(s.name)}</h2>
+      <div class="muted">${s.kind==="port"?"Marina":"Mouillage"} · ${s.lat.toFixed(3)}°N ${s.lon.toFixed(3)}°W</div>
+      <button class="close" onclick="SEL=null;BOOK.step='profile';renderPanel();renderDrawer()">✕</button>
+    </div>
+    ${s.kind==="port" ? `<div class="steps">
+      ${stepBtn("profile","1. Port")}${stepBtn("dispo","2. Places")}${stepBtn("paiement","3. Payer")}${stepBtn("confirme","✔")}
+    </div>` : ""}
+    <div class="body">
+      <p style="font-size:13px">${esc(s.desc)}</p>
+      <div class="card" style="margin-top:10px">
+        <h3>🌬️ Fiabilité de l'abri <span class="chip ${a.ok?"free":"prem"}" style="margin-left:4px">${a.txt}</span></h3>${a.det?`<div class="muted" style="font-size:12px;margin:4px 0">${a.det}</div>`:""}
+        <div class="wgrid">
+          <div class="wcell"><div class="l">Vent</div><div class="v" style="color:#22d3ee">${w.dir} ${w.wind} kt</div></div>
+          <div class="wcell"><div class="l">Rafales</div><div class="v" style="color:#fbbf24">${w.gust} kt</div></div>
+          <div class="wcell"><div class="l">Houle</div><div class="v" style="color:#38bdf8">${w.swell} m</div></div>
+          <div class="wcell"><div class="l">Air</div><div class="v">${w.air}°C</div></div>
+          <div class="wcell"><div class="l">Eau</div><div class="v" style="color:#38bdf8">${w.sea}°C</div></div>
+          <div class="wcell"><div class="l">Profondeur</div><div class="v">${s.depth} m</div></div>
+        </div>
+      </div>
+      ${s.kind==="port" && BOOK.step==="dispo" ? `
+      <div class="card"><h3>Disponibilités</h3>
+        <div class="wgrid">
+          <div class="wcell"><div class="l">Places</div><div class="v">${s.places}</div></div>
+          <div class="wcell"><div class="l">Occupées</div><div class="v" style="color:#fb7185">${s.occupied}</div></div>
+          <div class="wcell"><div class="l">Libres</div><div class="v" style="color:#34d399">${s.places-s.occupied}</div></div>
+        </div>
+        <div class="bar"><div style="width:${100-(s.occupied/s.places)*100}%"></div></div>
+        <button class="btn" onclick="BOOK.step='paiement';renderDrawer()">Réserver ma place · ${s.price}€/nuit</button>
+      </div>` : ""}
+      ${s.kind==="port" && BOOK.step==="paiement" ? `
+      <div class="card"><h3>Paiement en ligne 🔒</h3>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <div style="flex:1"><p class="muted">Nuits</p><input id="bNights" type="number" min="1" max="30" value="${BOOK.nights}"></div>
+          <div style="flex:1"><p class="muted">Longueur (m)</p><input id="bLoa" type="number" min="4" max="40" value="${BOOK.loa}"></div>
+        </div>
+        <p class="muted" style="margin-top:6px">Titulaire</p><input id="bName" placeholder="Antoine Martin" value="${esc(BOOK.name)}">
+        <p class="muted" style="margin-top:6px">Numéro de carte</p><input id="bCard" placeholder="4242 4242 4242 4242" value="${BOOK.card}">
+        <div class="row" style="margin-top:8px"><span class="muted">Total estimé</span><b class="tot" style="color:#34d399">${s.price*BOOK.nights + Math.round(BOOK.loa*.5)} €</b></div>
+        <button class="btn green" id="bPay" ${BOOK.card.replace(/\D/g,"").length<12||!BOOK.name.trim()?"disabled":""} onclick="pay('${s.id}')">Payer et confirmer</button>
+        <p class="muted" style="text-align:center;margin-top:4px">Démo : aucun paiement réel.</p>
+      </div>` : ""}
+      ${s.kind==="port" && BOOK.step==="confirme" && BOOKINGS[0] ? `
+      <div class="card" style="text-align:center;border-color:#047857;background:rgba(6,78,59,.3)">
+        <div style="font-size:26px">🎉</div><b style="color:#34d399">Réservation confirmée !</b>
+        <p style="font-size:13px">${esc(BOOKINGS[0].spot)} · ${BOOKINGS[0].nights} nuit(s)</p>
+        <p class="muted">Réf. <b>${BOOKINGS[0].ref}</b> · ${BOOKINGS[0].total} € payés</p>
+      </div>` : ""}
+      ${s.amen ? `<h3 style="font-size:14px;margin-top:6px">Services</h3><div>${s.amen.map(a=>`<span class="chip">${esc(a)}</span>`).join("")}</div>` : ""}
+      <h3 style="font-size:14px;margin-top:12px">Avis de la communauté <span class="stars">★ ${avg(s)}</span> <span class="muted">(${revs.length})</span></h3>
+      ${revs.map(r=>`<div class="rev"><div class="row"><b>${esc(r.user)}</b><span class="stars">${"★".repeat(r.stars)}<span style="color:#475569">${"★".repeat(5-r.stars)}</span></span></div>${esc(r.text)}<div class="muted">${r.date}</div></div>`).join("")}
+      <div class="rev" style="margin-top:10px">
+        <div style="display:flex;gap:6px"><input id="rvUser" placeholder="Votre pseudo" style="flex:1"><select id="rvStars" style="width:80px">${[5,4,3,2,1].map(n=>`<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select></div>
+        <textarea id="rvText" placeholder="Votre expérience (abri, accueil, fond…)" rows="2" style="margin-top:6px"></textarea>
+        <button class="btn" onclick="submitReview('${s.id}')">Publier mon avis</button>
+      </div>
+    </div>`;
+  if (BOOK.step==="paiement") {
+    const refresh = () => {
+      const s = SPOTS.find(x=>x.id===SEL);
+      const nights = Math.max(1, Math.min(30, +($("#bNights").value)||1));
+      const loa = Math.max(4, Math.min(40, +($("#bLoa").value)||4));
+      const name = $("#bName").value.trim();
+      const card = $("#bCard").value;
+      BOOK.nights = nights; BOOK.loa = loa; BOOK.name = name; BOOK.card = card;
+      d.querySelector(".tot").textContent = (s.price*nights + Math.round(loa*.5)) + " €";
+      d.querySelector("#bPay").disabled = card.replace(/\D/g,"").length < 12 || !name;
+    };
+    ["bNights","bLoa","bName","bCard"].forEach(id=>{
+      const el = d.querySelector("#"+id); if (el) el.addEventListener("input", refresh);
+    });
+  }
+}
+function pay(id) {
+  const s = SPOTS.find(x=>x.id===id);
+  const total = s.price*BOOK.nights + Math.round(BOOK.loa*.5);
+  const ref = "AM-" + Math.random().toString(36).slice(2,8).toUpperCase();
+  BOOKINGS.unshift({ ref, spot:s.name, nights:BOOK.nights, total, date:new Date().toISOString().slice(0,10) });
+  BOOK.paid = true; BOOK.step = "confirme";
+  const b = $("#bkBadge"); b.style.display = "inline-block"; b.textContent = BOOKINGS.length + " réservation(s)";
+  renderDrawer(); renderPanel();
+}
+function submitReview(id) {
+  const u = $("#rvUser").value.trim(), t = $("#rvText").value.trim();
+  if (!u || !t) return;
+  (USER_REVIEWS[id] = USER_REVIEWS[id]||[]).push({ user:u, stars:+$("#rvStars").value, text:t, date:new Date().toISOString().slice(0,10) });
+  renderDrawer(); renderPanel();
+}
+
+// ================== INIT ==================
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  TAB = b.dataset.tab;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active", x===b));
+  renderPanel();
+});
+if (typeof L === "undefined") {
+  document.getElementById("layout").style.display = "none";
+  document.getElementById("fallback").style.display = "block";
+} else {
+  initMap(); renderPanel();
+}
+</script>
+</body>
+</html>
